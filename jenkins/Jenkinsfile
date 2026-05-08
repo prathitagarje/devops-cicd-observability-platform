@@ -1,4 +1,5 @@
 pipeline {
+
     agent any
 
     options {
@@ -7,118 +8,189 @@ pipeline {
     }
 
     parameters {
-        string(name: 'GIT_REPO', defaultValue: 'https://github.com/prathitagarje/devops-cicd-observability-platform.git', description: 'Git repository for the application')
-        string(name: 'DOCKER_HUB_REPO', defaultValue: 'prathitagarje/basic-webapp', description: 'Docker Hub repository name')
-        string(name: 'DOCKER_HUB_CREDENTIALS', defaultValue: 'dockerhub-credentials', description: 'Jenkins credential ID for Docker Hub login')
+
+        string(
+            name: 'GIT_REPO',
+            defaultValue: 'https://github.com/prathitagarje/devops-cicd-observability-platform.git',
+            description: 'Git repository'
+        )
+
+        string(
+            name: 'DOCKER_HUB_REPO',
+            defaultValue: 'prathitagarje/basic-webapp',
+            description: 'Docker Hub repository'
+        )
+
+        string(
+            name: 'DOCKER_HUB_CREDENTIALS',
+            defaultValue: 'dockerhub-credentials',
+            description: 'Docker Hub Credentials ID'
+        )
     }
 
     environment {
+
         IMAGE_TAG = "${BUILD_NUMBER}"
+
+        IMAGE_NAME = "${params.DOCKER_HUB_REPO}:${BUILD_NUMBER}"
+
+        LATEST_IMAGE = "${params.DOCKER_HUB_REPO}:latest"
+
         CONTAINER_NAME = "basic-webapp"
     }
 
     stages {
 
         stage('Checkout') {
-    steps {
-        echo 'Code already checked out by Jenkins'
-    }
-}
+
+            steps {
+
+                echo 'Code already checked out by Jenkins'
+
+                sh 'pwd'
+
+                sh 'ls -R'
+            }
+        }
 
         stage('Build Image') {
 
-    steps {
+            steps {
 
-        echo 'Building Docker image...'
+                echo 'Building Docker image...'
 
-        sh '''
-            docker build -t myapp:latest ./app
-        '''
-    }
-}
+                sh '''
+                    docker build \
+                    -t ${IMAGE_NAME} \
+                    -t ${LATEST_IMAGE} \
+                    ./app
+                '''
+            }
+        }
 
         stage('Test Container') {
-            steps {
-                script {
-                    sh '''
-                    docker run -d --name test-container -p 3001:3000 ${params.DOCKER_HUB_REPO}:${IMAGE_TAG}
 
-                    for i in {1..10}; do
-                      if curl -s http://localhost:3001/health; then
-                        echo "App is up!"
-                        break
-                      fi
-                      sleep 3
-                    done
+            steps {
+
+                echo 'Testing Docker container...'
+
+                sh '''
+
+                    docker rm -f test-container || true
+
+                    docker run -d \
+                      --name test-container \
+                      -p 3001:3000 \
+                      ${IMAGE_NAME}
+
+                    sleep 10
 
                     curl -f http://localhost:3001/health
 
                     docker stop test-container
+
                     docker rm test-container
+                '''
+            }
+        }
+
+        stage('Push Image') {
+
+            steps {
+
+                echo 'Pushing image to DockerHub...'
+
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: "${params.DOCKER_HUB_CREDENTIALS}",
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]) {
+
+                    sh '''
+
+                        echo "$DOCKER_PASS" | docker login \
+                        -u "$DOCKER_USER" \
+                        --password-stdin
+
+                        docker push ${IMAGE_NAME}
+
+                        docker push ${LATEST_IMAGE}
                     '''
                 }
             }
         }
 
-        stage('Push Image') {
-            steps {
-                script {
-                    docker.withRegistry('', "${params.DOCKER_HUB_CREDENTIALS}") {
-                        dockerImage.push()
-                        dockerImage.push('latest')
-                    }
-                }
-            }
-        }
-
         stage('Deploy') {
+
             steps {
-                script {
-                    sh '''
+
+                echo 'Deploying container...'
+
+                sh '''
+
                     docker stop ${CONTAINER_NAME} || true
+
                     docker rm ${CONTAINER_NAME} || true
 
                     docker run -d \
                       --name ${CONTAINER_NAME} \
                       -p 3000:3000 \
                       --restart always \
-                      ${params.DOCKER_HUB_REPO}:latest
-                    '''
-                }
+                      ${LATEST_IMAGE}
+                '''
             }
         }
 
         stage('Health Check') {
+
             steps {
-                script {
-                    sh '''
-                    for i in {1..10}; do
-                      if curl -f http://localhost:3000/health; then
-                        echo "Application is healthy!"
-                        exit 0
-                      fi
-                      sleep 3
+
+                echo 'Performing health check...'
+
+                sh '''
+
+                    for i in {1..10}
+                    do
+
+                        if curl -f http://localhost:3000/health
+                        then
+                            echo "Application is healthy!"
+                            exit 0
+                        fi
+
+                        echo "Waiting for application..."
+
+                        sleep 5
+
                     done
+
                     echo "Health check failed!"
+
                     exit 1
-                    '''
-                }
+                '''
             }
         }
     }
 
     post {
+
         always {
-            echo 'Cleaning workspace...'
+
+            echo 'Cleaning Docker resources...'
+
             sh 'docker system prune -f || true'
         }
 
         success {
-            echo 'Deployment successful'
+
+            echo 'Pipeline executed successfully!'
         }
 
         failure {
-            echo 'Pipeline failed'
+
+            echo 'Pipeline execution failed!'
         }
     }
 }
