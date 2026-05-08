@@ -57,9 +57,14 @@ pipeline {
 
             steps {
 
-                echo 'Building Docker image...'
+                echo "Building Docker image with DOCKER_HUB_REPO=${params.DOCKER_HUB_REPO}..."
 
                 sh '''
+                    if [[ "${DOCKER_HUB_REPO}" =~ ^https?:// ]]; then
+                      echo "ERROR: DOCKER_HUB_REPO must be in the form username/repo, not a URL"
+                      exit 1
+                    fi
+
                     docker build \
                     -t ${IMAGE_NAME} \
                     -t ${LATEST_IMAGE} \
