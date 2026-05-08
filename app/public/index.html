@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>DevOps Webapp</title>
+
+  <link rel="stylesheet" href="/style.css" />
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f6fa;
+      text-align: center;
+      padding: 50px;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      display: inline-block;
+    }
+    button {
+      margin-top: 15px;
+      padding: 10px 15px;
+      border: none;
+      background: #007bff;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+  </style>
+</head>
+
+<body>
+  <main class="container">
+    <h1>🚀 DevOps CI/CD App</h1>
+    <p id="message">Loading message...</p>
+    <button id="refresh">🔄 Refresh</button>
+  </main>
+
+  <script>
+    async function fetchMessage() {
+      const messageEl = document.getElementById('message');
+      messageEl.textContent = "Loading...";
+
+      try {
+        const res = await fetch('/api/hello');
+
+        if (!res.ok) {
+          throw new Error("API failed");
+        }
+
+        const json = await res.json();
+
+        messageEl.textContent =
+          json.message + " (" + new Date(json.time).toLocaleString() + ")";
+      } catch (err) {
+        messageEl.textContent = "❌ Failed to load message";
+      }
+    }
+
+    document.getElementById('refresh').addEventListener('click', fetchMessage);
+
+    // Auto load on page open
+    fetchMessage();
+  </script>
+</body>
+</html>
