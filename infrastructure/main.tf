@@ -1,3 +1,12 @@
+terraform {
+  required_providers {
+    local = {
+      source  = "hashicorp/local"
+      version = ">= 2.0.0"
+    }
+  }
+}
+
 provider "aws" {
   region = var.aws_region
 }
@@ -11,6 +20,12 @@ resource "tls_private_key" "jenkins" {
 resource "aws_key_pair" "jenkins_key" {
   key_name   = "jenkins"
   public_key = tls_private_key.jenkins.public_key_openssh
+}
+
+resource "local_file" "jenkins_private_key" {
+  content         = tls_private_key.jenkins.private_key_pem
+  filename        = "${path.module}/jenkins.pem"
+  file_permission = "0400"
 }
 
 # Security Group to allow SSH, HTTP, HTTPS, and Jenkins port
