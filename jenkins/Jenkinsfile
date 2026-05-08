@@ -20,11 +20,10 @@ pipeline {
     stages {
 
         stage('Checkout') {
-            steps {
-                echo "Checking out code from ${params.GIT_REPO}..."
-                git branch: 'main', url: "${params.GIT_REPO}"
-            }
-        }
+    steps {
+        echo 'Code already checked out by Jenkins'
+    }
+}
 
         stage('Build Image') {
             steps {
